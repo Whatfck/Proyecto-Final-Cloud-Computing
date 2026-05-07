@@ -4,17 +4,17 @@ resource "aws_security_group" "db" {
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description     = "MySQL from Lambda"
-    from_port       = 3306
-    to_port         = 3306
+    description     = "PostgreSQL from Lambda"
+    from_port       = var.db_port
+    to_port         = var.db_port
     protocol        = "tcp"
     security_groups = [aws_security_group.lambda.id]
   }
 
   ingress {
-    description     = "MySQL from internal services"
-    from_port       = 3306
-    to_port         = 3306
+    description     = "PostgreSQL from internal services"
+    from_port       = var.db_port
+    to_port         = var.db_port
     protocol        = "tcp"
     security_groups = [aws_security_group.internal.id]
   }
@@ -46,12 +46,12 @@ resource "aws_db_instance" "marketplace" {
   allocated_storage       = 20
   storage_type            = "gp2"
   engine                  = var.db_engine
-  engine_version          = var.db_engine_version
+  engine_version          = var.db_engine_version != "" ? var.db_engine_version : null
   instance_class          = var.db_instance_class
   db_name                 = var.db_name
   username                = var.db_username
   password                = var.db_password
-  port                    = 3306
+  port                    = var.db_port
   publicly_accessible     = false
   multi_az                = false
   skip_final_snapshot     = true

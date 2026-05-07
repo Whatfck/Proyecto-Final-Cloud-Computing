@@ -60,7 +60,15 @@ Verifica identidad:
 aws sts get-caller-identity
 ```
 
-### Desplegar infraestructura
+## Quick Start
+
+### 1. Preparar el build del backend
+
+```bash
+./deploy.sh us-east-1
+```
+
+### 2. Desplegar infraestructura
 
 ```bash
 cd infra/terraform
@@ -72,33 +80,30 @@ terraform plan -var-file=terraform.tfvars
 terraform apply -var-file=terraform.tfvars
 ```
 
-### Revisar resultados
+### 3. Revisar salidas útiles
 
 ```bash
 terraform output
 terraform state list
 ```
 
-### Eliminar recursos
+### 4. Borrar todo al terminar
 
 ```bash
 terraform destroy -var-file=terraform.tfvars
 ```
 
-## Flujo de trabajo del grupo
+## Flujo de uso rápido
 
-1. Terraform crea la red, el balanceador, las EC2, S3, SQS, SNS, IAM, Lambda y RDS.
-2. Las EC2 arrancan con NGINX y quedan detrás del ALB.
-3. El frontend se sirve desde la capa web del proyecto.
-4. El vendedor publica productos e imágenes.
-5. El comprador crea una orden.
-6. La orden se procesa de forma asíncrona.
-7. SNS distribuye eventos a las colas y Lambdas suscritas.
-8. RDS conserva la información del marketplace.
+1. Configura AWS con `aws configure`.
+2. Compila y sube el backend con `./deploy.sh us-east-1`.
+3. Entra a `infra/terraform` y corre `terraform apply -var-file=terraform.tfvars`.
+4. Abre el `alb_dns_name` que imprime `terraform output`.
+5. Cuando termines, ejecuta `terraform destroy -var-file=terraform.tfvars`.
 
 ## Documentación complementaria
 
-- [Flujo de funcionamiento final](FLUJO_FUNCIONAMIENTO_FINAL.md)
+- [Funcionamiento esperado](FUNCIONAMIENTO.md)
 
 ## Notas
 

@@ -28,6 +28,11 @@ output "product_images_bucket_name" {
   value       = aws_s3_bucket.product_images.bucket
 }
 
+output "builds_bucket_name" {
+  description = "S3 bucket name for compiled builds"
+  value       = aws_s3_bucket.builds.bucket
+}
+
 output "orders_queue_url" {
   description = "Main orders SQS queue URL"
   value       = aws_sqs_queue.orders.id

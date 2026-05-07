@@ -119,63 +119,21 @@ resource "aws_launch_template" "web" {
   instance_type = var.ec2_instance_type
 
   vpc_security_group_ids = [aws_security_group.web.id]
+  iam_instance_profile {
+    name = aws_iam_instance_profile.ec2_marketplace.name
+  }
 
-  user_data = base64encode(<<-EOF
-    #!/bin/bash
-    set -euxo pipefail
-
-    export DEBIAN_FRONTEND=noninteractive
-    apt-get update -y
-    apt-get install -y nginx
-
-    cat >/var/www/html/index.html <<'HTML'
-    <!doctype html>
-    <html lang="es">
-      <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>${var.project_name} Frontend</title>
-        <style>
-          body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            min-height: 100vh;
-            display: grid;
-            place-items: center;
-            background: linear-gradient(135deg, #0f172a, #1e293b);
-            color: #e2e8f0;
-          }
-          .card {
-            max-width: 640px;
-            padding: 32px;
-            border-radius: 20px;
-            background: rgba(15, 23, 42, 0.85);
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
-            border: 1px solid rgba(148, 163, 184, 0.2);
-          }
-          h1 { margin-top: 0; }
-          code {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 8px;
-            background: rgba(148, 163, 184, 0.12);
-          }
-        </style>
-      </head>
-      <body>
-        <main class="card">
-          <h1>${var.project_name}</h1>
-          <p>Frontend servido desde EC2 Ubuntu con NGINX bajo un ALB de Terraform.</p>
-          <p>Host: <code>${var.project_name}-web-node</code></p>
-        </main>
-      </body>
-    </html>
-    HTML
-
-    systemctl enable nginx
-    systemctl restart nginx
-  EOF
-  )
+  user_data = base64encode(templatefile("${path.module}/user_data.sh", {
+    aws_region           = var.aws_region
+    aws_access_key_id    = var.aws_access_key_id
+    aws_secret_key       = var.aws_secret_access_key
+    db_endpoint          = aws_db_instance.marketplace.endpoint
+    db_port              = var.db_port
+    db_password          = var.db_password
+    s3_bucket_name       = aws_s3_bucket.product_images.id
+    builds_bucket_name   = aws_s3_bucket.builds.id
+    orders_queue_url     = aws_sqs_queue.orders.url
+  }))
 
   tag_specifications {
     resource_type = "instance"

@@ -38,13 +38,19 @@ variable "db_instance_class" {
 variable "db_engine" {
   description = "Database engine for the marketplace demo"
   type        = string
-  default     = "mysql"
+  default     = "postgres"
 }
 
 variable "db_engine_version" {
   description = "Database engine version for the marketplace demo"
   type        = string
-  default     = "8.0.36"
+  default     = ""
+}
+
+variable "db_port" {
+  description = "Database port for the marketplace demo"
+  type        = number
+  default     = 5432
 }
 
 variable "lambda_runtime" {
@@ -111,6 +117,20 @@ variable "azs" {
   description = "Availability zones to use"
   type        = list(string)
   default     = ["us-east-1a", "us-east-1b"]
+}
+
+variable "aws_access_key_id" {
+  description = "AWS Access Key ID for EC2 instances to access S3 and other AWS services"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "aws_secret_access_key" {
+  description = "AWS Secret Access Key for EC2 instances to access S3 and other AWS services"
+  type        = string
+  default     = ""
+  sensitive   = true
 }
 
 variable "tags" {

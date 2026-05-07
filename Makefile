@@ -1,4 +1,4 @@
-.PHONY: help init plan apply destroy validate fmt clean deploy build backend-build
+.PHONY: help init plan apply destroy destroy-costly restore-costly validate fmt clean deploy build backend-build
 
 # Default target
 help:
@@ -8,7 +8,9 @@ help:
 	@echo ""
 	@echo "📋 Quick Commands:"
 	@echo "  make apply       - Deploy infrastructure to AWS"
-	@echo "  make destroy     - Destroy all AWS resources"
+	@echo "  make destroy        - Destroy all AWS resources"
+	@echo "  make destroy-costly - Destroy only paid resources (RDS, ALB, EC2)"
+	@echo "  make restore-costly - Recreate paid resources (RDS, ALB, EC2)"
 	@echo ""
 	@echo "🔧 Terraform Commands:"
 	@echo "  make init        - Initialize Terraform"
@@ -85,6 +87,32 @@ destroy:
 	@(cd infra/terraform && \
 	terraform destroy -var-file=terraform.tfvars -auto-approve && \
 	echo "✓ Resources destroyed")
+
+# Destroy only the resources that generate cost (RDS, ALB, EC2)
+destroy-costly:
+	@echo "💸 Destroying only paid resources (RDS, ALB, EC2)..."
+	@(cd infra/terraform && \
+	terraform destroy \
+		-target=aws_db_instance.marketplace \
+		-target=aws_lb.web \
+		-target=aws_lb_listener.http \
+		-target=aws_autoscaling_group.web \
+		-target=aws_launch_template.web \
+		-var-file=terraform.tfvars -auto-approve && \
+	echo "✓ Paid resources destroyed — Lambda, SQS, SNS, S3 siguen activos")
+
+# Recreate paid resources after destroy-costly
+restore-costly:
+	@echo "🔄 Recreating paid resources (RDS, ALB, EC2)..."
+	@(cd infra/terraform && \
+	terraform apply \
+		-target=aws_db_instance.marketplace \
+		-target=aws_lb.web \
+		-target=aws_lb_listener.http \
+		-target=aws_autoscaling_group.web \
+		-target=aws_launch_template.web \
+		-var-file=terraform.tfvars -auto-approve && \
+	echo "✓ Paid resources restored")
 
 # Clean up local artifacts
 clean:

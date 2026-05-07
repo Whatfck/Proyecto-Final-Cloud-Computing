@@ -1,0 +1,19 @@
+# Claves SSH
+*.pem
+*.key
+
+# Variables de entorno
+.env
+.env.*
+!.env.example
+
+# Artefactos de build
+*.tar.gz
+*.zip
+
+# Node
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db

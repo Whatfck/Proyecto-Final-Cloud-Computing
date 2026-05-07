@@ -69,7 +69,8 @@ resource "aws_iam_policy" "lambda_marketplace" {
           "sns:Publish"
         ]
         Resource = [
-          aws_sns_topic.orders_events.arn
+          aws_sns_topic.orders_events.arn,
+          aws_sns_topic.admin_alerts.arn
         ]
       },
       {
@@ -77,6 +78,13 @@ resource "aws_iam_policy" "lambda_marketplace" {
         Action = [
           "rds:DescribeDBInstances",
           "rds:DescribeDBClusters"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "rekognition:DetectModerationLabels"
         ]
         Resource = "*"
       }
@@ -182,4 +190,10 @@ resource "aws_iam_policy" "ec2_marketplace" {
 resource "aws_iam_role_policy_attachment" "ec2_marketplace_policy" {
   role       = aws_iam_role.ec2_marketplace.name
   policy_arn = aws_iam_policy.ec2_marketplace.arn
+}
+
+# SSM para acceso sin SSH
+resource "aws_iam_role_policy_attachment" "ec2_ssm" {
+  role       = aws_iam_role.ec2_marketplace.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }

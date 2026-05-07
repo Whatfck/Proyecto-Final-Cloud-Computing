@@ -141,10 +141,34 @@ Environment="PORT=3000"
 WantedBy=multi-user.target
 EOF
 
+cat > /etc/systemd/system/marketplace-canary.service << 'EOF'
+[Unit]
+Description=Marketplace Node.js Backend Canary
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/app/backend
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=marketplace-canary
+Environment="NODE_ENV=production"
+Environment="PORT=3001"
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 systemctl daemon-reload
 systemctl enable marketplace.service
 systemctl start marketplace.service
-echo "✓ Systemd service configured and started"
+systemctl enable marketplace-canary.service
+systemctl start marketplace-canary.service
+echo "✓ Systemd services configured and started"
 
 # 8. Setup NGINX reverse proxy
 echo "[7/8] Setting up NGINX reverse proxy..."
@@ -152,7 +176,8 @@ apt-get install -y nginx
 
 cat > /etc/nginx/sites-available/default << 'NGINX_EOF'
 upstream marketplace {
-    server localhost:3000;
+    server localhost:3000 weight=7;
+    server localhost:3001 weight=3;
 }
 
 server {

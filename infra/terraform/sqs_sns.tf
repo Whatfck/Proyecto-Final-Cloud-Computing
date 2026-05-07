@@ -38,6 +38,14 @@ resource "aws_sns_topic" "orders_events" {
   })
 }
 
+resource "aws_sns_topic" "admin_alerts" {
+  name = "${var.project_name}-admin-alerts"
+
+  tags = merge(var.tags, {
+    Name = "${var.project_name}-admin-alerts"
+  })
+}
+
 resource "aws_sns_topic_subscription" "payment_processor" {
   topic_arn = aws_sns_topic.orders_events.arn
   protocol  = "sqs"

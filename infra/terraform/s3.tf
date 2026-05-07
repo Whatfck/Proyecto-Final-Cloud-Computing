@@ -50,3 +50,15 @@ resource "aws_s3_bucket_versioning" "builds" {
     status = "Enabled"
   }
 }
+
+resource "aws_s3_bucket_notification" "product_images_validation" {
+  bucket = aws_s3_bucket.product_images.id
+
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.image_validator.arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_prefix       = "products/"
+  }
+
+  depends_on = [aws_lambda_permission.s3_invoke_validator]
+}

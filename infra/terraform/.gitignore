@@ -3,5 +3,8 @@ build/
 *.tfstate
 *.tfstate.*
 *.tfvars
+!terraform.tfvars.example
 .terraform.lock.hcl
 crash.log
+*.pem
+*.key

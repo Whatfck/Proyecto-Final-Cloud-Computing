@@ -56,6 +56,14 @@ resource "aws_security_group" "web" {
     security_groups = [aws_security_group.alb.id]
   }
 
+  ingress {
+    description = "SSH temporal"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -117,6 +125,7 @@ resource "aws_launch_template" "web" {
   name_prefix   = "${var.project_name}-web-"
   image_id      = data.aws_ami.ubuntu.id
   instance_type = var.ec2_instance_type
+  key_name      = "grupo3-marketplace-key"
 
   vpc_security_group_ids = [aws_security_group.web.id]
   iam_instance_profile {
@@ -153,7 +162,7 @@ resource "aws_launch_template" "web" {
 }
 
 resource "aws_autoscaling_group" "web" {
-  name                      = "${var.project_name}-asg"
+  name_prefix               = "${var.project_name}-asg-"
   min_size                  = var.ec2_min_capacity
   desired_capacity          = var.ec2_desired_capacity
   max_size                  = var.ec2_max_capacity

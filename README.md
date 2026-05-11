@@ -37,7 +37,8 @@ aws --version
 ### Clonar el repositorio
 
 ```bash
-git clone <URL_DEL_REPO>
+git clone https://github.com/Whatfck/Proyecto-Final-Cloud-Computing
+
 cd Proyecto-Final-Cloud-Computing
 ```
 

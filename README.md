@@ -38,7 +38,6 @@ aws --version
 
 ```bash
 git clone https://github.com/Whatfck/Proyecto-Final-Cloud-Computing
-
 cd Proyecto-Final-Cloud-Computing
 ```
 

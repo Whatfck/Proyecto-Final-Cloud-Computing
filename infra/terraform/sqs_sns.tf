@@ -46,6 +46,21 @@ resource "aws_sns_topic" "admin_alerts" {
   })
 }
 
+# Email subscriptions (only if admin_email is provided)
+resource "aws_sns_topic_subscription" "orders_email" {
+  count     = var.admin_email != "" ? 1 : 0
+  topic_arn = aws_sns_topic.orders_events.arn
+  protocol  = "email"
+  endpoint  = var.admin_email
+}
+
+resource "aws_sns_topic_subscription" "admin_alerts_email" {
+  count     = var.admin_email != "" ? 1 : 0
+  topic_arn = aws_sns_topic.admin_alerts.arn
+  protocol  = "email"
+  endpoint  = var.admin_email
+}
+
 resource "aws_sns_topic_subscription" "payment_processor" {
   topic_arn = aws_sns_topic.orders_events.arn
   protocol  = "sqs"
@@ -62,7 +77,7 @@ resource "aws_sns_topic_subscription" "seller_notifier" {
   endpoint  = aws_sqs_queue.seller_notifications.arn
 
   filter_policy = jsonencode({
-    eventType = ["SELLER_NOTIFY"]
+    eventType = ["ORDER_CREATED"]
   })
 }
 

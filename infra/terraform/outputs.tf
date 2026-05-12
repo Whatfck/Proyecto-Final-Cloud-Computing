@@ -48,6 +48,11 @@ output "orders_events_topic_arn" {
   value       = aws_sns_topic.orders_events.arn
 }
 
+output "admin_alerts_topic_arn" {
+  description = "SNS topic ARN for admin alerts"
+  value       = aws_sns_topic.admin_alerts.arn
+}
+
 output "lambda_execution_role_arn" {
   description = "IAM role ARN for Lambda execution"
   value       = aws_iam_role.lambda_execution.arn
@@ -103,9 +108,19 @@ output "web_target_group_arn" {
   value       = aws_lb_target_group.web.arn
 }
 
-output "web_autoscaling_group_name" {
-  description = "Name of the web autoscaling group"
-  value       = aws_autoscaling_group.web.name
+output "web_main_instance_id" {
+  description = "The ID of the main web EC2 instance"
+  value       = aws_instance.main_app.id
+}
+
+output "web_canary_instance_id" {
+  description = "The ID of the canary web EC2 instance"
+  value       = aws_instance.canary_app.id
+}
+
+output "web_nginx_proxy_id" {
+  description = "The ID of the NGINX proxy EC2 instance"
+  value       = aws_instance.nginx_proxy.id
 }
 
 output "web_instance_security_group_id" {

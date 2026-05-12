@@ -19,6 +19,14 @@ resource "aws_security_group" "db" {
     security_groups = [aws_security_group.internal.id]
   }
 
+  ingress {
+    description     = "PostgreSQL from Web instances"
+    from_port       = var.db_port
+    to_port         = var.db_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.web.id]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0

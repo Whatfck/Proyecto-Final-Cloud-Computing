@@ -16,7 +16,14 @@ def handler(event, context):
 
     for record in event.get("Records", []):
         body = record.get("body", "{}")
-        payload = json.loads(body)
+        try:
+            sns_msg = json.loads(body)
+            if "Message" in sns_msg:
+                payload = json.loads(sns_msg["Message"])
+            else:
+                payload = sns_msg
+        except:
+            payload = json.loads(body)
 
         order_id = payload.get("orderId", "unknown")
         product_name = payload.get("productName", "N/A")

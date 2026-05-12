@@ -11,6 +11,8 @@ locals {
     ADMIN_TOPIC_ARN  = aws_sns_topic.admin_alerts.arn
     DLQ_URL          = aws_sqs_queue.orders_dlq.url
   }
+
+  pg8000_layer_arn = aws_lambda_layer_version.pg8000.arn
 }
 
 resource "aws_security_group" "lambda" {
@@ -60,6 +62,37 @@ data "archive_file" "image_validator" {
   output_path = "${path.module}/build/image_validator.zip"
 }
 
+data "archive_file" "order_entry" {
+  type        = "zip"
+  source_dir  = "${local.lambda_source_dir}/order_entry"
+  output_path = "${path.module}/build/order_entry.zip"
+}
+
+data "archive_file" "list_orders" {
+  type        = "zip"
+  source_dir  = "${local.lambda_source_dir}/list_orders"
+  output_path = "${path.module}/build/list_orders.zip"
+}
+
+data "archive_file" "list_products" {
+  type        = "zip"
+  source_dir  = "${local.lambda_source_dir}/list_products"
+  output_path = "${path.module}/build/list_products.zip"
+}
+
+data "archive_file" "pg8000_layer" {
+  type        = "zip"
+  source_dir  = "${path.module}/layers/pg8000"
+  output_path = "${path.module}/build/pg8000_layer.zip"
+}
+
+resource "aws_lambda_layer_version" "pg8000" {
+  filename            = data.archive_file.pg8000_layer.output_path
+  layer_name          = "${var.project_name}-pg8000-layer"
+  compatible_runtimes = ["python3.11"]
+  source_code_hash    = data.archive_file.pg8000_layer.output_base64sha256
+}
+
 resource "aws_lambda_function" "process_order" {
   function_name    = "${var.project_name}-process-order"
   role             = aws_iam_role.lambda_execution.arn
@@ -69,6 +102,7 @@ resource "aws_lambda_function" "process_order" {
   source_code_hash = data.archive_file.process_order.output_base64sha256
   timeout          = var.lambda_timeout
   memory_size      = var.lambda_memory_size
+  layers           = [local.pg8000_layer_arn]
 
   vpc_config {
     subnet_ids         = [for subnet in aws_subnet.private : subnet.id]
@@ -99,6 +133,7 @@ resource "aws_lambda_function" "seller_notifier" {
   source_code_hash = data.archive_file.seller_notifier.output_base64sha256
   timeout          = var.lambda_timeout
   memory_size      = var.lambda_memory_size
+  layers           = [local.pg8000_layer_arn]
 
   vpc_config {
     subnet_ids         = [for subnet in aws_subnet.private : subnet.id]
@@ -129,6 +164,7 @@ resource "aws_lambda_function" "inventory_updater" {
   source_code_hash = data.archive_file.inventory_updater.output_base64sha256
   timeout          = var.lambda_timeout
   memory_size      = var.lambda_memory_size
+  layers           = [local.pg8000_layer_arn]
 
   vpc_config {
     subnet_ids         = [for subnet in aws_subnet.private : subnet.id]
@@ -182,7 +218,7 @@ resource "aws_sns_topic_subscription" "inventory_updater" {
   endpoint  = aws_lambda_function.inventory_updater.arn
 
   filter_policy = jsonencode({
-    eventType = ["INVENTORY_UPDATE"]
+    eventType = ["ORDER_CREATED"]
   })
 
   depends_on = [aws_lambda_permission.inventory_updater_from_sns]
@@ -197,6 +233,7 @@ resource "aws_lambda_function" "dlq_monitor" {
   source_code_hash = data.archive_file.dlq_monitor.output_base64sha256
   timeout          = var.lambda_timeout
   memory_size      = var.lambda_memory_size
+  layers           = [local.pg8000_layer_arn]
 
   vpc_config {
     subnet_ids         = [for subnet in aws_subnet.private : subnet.id]
@@ -227,6 +264,7 @@ resource "aws_lambda_function" "image_validator" {
   source_code_hash = data.archive_file.image_validator.output_base64sha256
   timeout          = var.lambda_timeout
   memory_size      = var.lambda_memory_size
+  layers           = [local.pg8000_layer_arn]
 
   vpc_config {
     subnet_ids         = [for subnet in aws_subnet.private : subnet.id]
@@ -245,6 +283,87 @@ resource "aws_lambda_function" "image_validator" {
 
   tags = merge(var.tags, {
     Name = "${var.project_name}-image-validator"
+  })
+}
+
+resource "aws_lambda_function" "order_entry" {
+  function_name    = "${var.project_name}-order-entry"
+  role             = aws_iam_role.lambda_execution.arn
+  handler          = "main.handler"
+  runtime          = var.lambda_runtime
+  filename         = data.archive_file.order_entry.output_path
+  source_code_hash = data.archive_file.order_entry.output_base64sha256
+  timeout          = 60
+  memory_size      = var.lambda_memory_size
+  layers           = [local.pg8000_layer_arn]
+
+  vpc_config {
+    subnet_ids         = [for subnet in aws_subnet.private : subnet.id]
+    security_group_ids = [aws_security_group.lambda.id]
+  }
+
+  environment {
+    variables = local.lambda_common_env_vars
+  }
+
+  depends_on = [
+    aws_iam_role_policy_attachment.lambda_basic,
+    aws_iam_role_policy_attachment.lambda_vpc_access,
+    aws_iam_role_policy_attachment.lambda_marketplace_policy
+  ]
+
+  tags = merge(var.tags, {
+    Name = "${var.project_name}-order-entry"
+  })
+}
+
+resource "aws_lambda_function" "list_orders" {
+  function_name    = "${var.project_name}-list-orders"
+  role             = aws_iam_role.lambda_execution.arn
+  handler          = "main.handler"
+  runtime          = var.lambda_runtime
+  filename         = data.archive_file.list_orders.output_path
+  source_code_hash = data.archive_file.list_orders.output_base64sha256
+  timeout          = var.lambda_timeout
+  memory_size      = var.lambda_memory_size
+  layers           = [local.pg8000_layer_arn]
+
+  environment {
+    variables = local.lambda_common_env_vars
+  }
+
+  vpc_config {
+    subnet_ids         = [for subnet in aws_subnet.private : subnet.id]
+    security_group_ids = [aws_security_group.lambda.id]
+  }
+
+  tags = merge(var.tags, {
+    Name = "${var.project_name}-list-orders"
+  })
+}
+
+resource "aws_lambda_function" "list_products" {
+  function_name    = "${var.project_name}-list-products"
+  role             = aws_iam_role.lambda_execution.arn
+  handler          = "main.handler"
+  runtime          = var.lambda_runtime
+  filename         = data.archive_file.list_products.output_path
+  source_code_hash = data.archive_file.list_products.output_base64sha256
+  timeout          = var.lambda_timeout
+  memory_size      = var.lambda_memory_size
+  layers           = [local.pg8000_layer_arn]
+
+  environment {
+    variables = local.lambda_common_env_vars
+  }
+
+  vpc_config {
+    subnet_ids         = [for subnet in aws_subnet.private : subnet.id]
+    security_group_ids = [aws_security_group.lambda.id]
+  }
+
+  tags = merge(var.tags, {
+    Name = "${var.project_name}-list-products"
   })
 }
 

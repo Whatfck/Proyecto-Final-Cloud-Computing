@@ -147,3 +147,29 @@ resource "aws_security_group" "internal" {
     Name = "${local.name_prefix}-internal-sg"
   })
 }
+# VPC Endpoints for SNS and SQS (needed for Lambdas in private subnets)
+resource "aws_vpc_endpoint" "sns" {
+  vpc_id              = aws_vpc.main.id
+  service_name        = "com.amazonaws.us-east-1.sns"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = [for subnet in aws_subnet.private : subnet.id]
+  security_group_ids  = [aws_security_group.internal.id]
+  private_dns_enabled = true
+
+  tags = merge(var.tags, {
+    Name = "${local.name_prefix}-sns-endpoint"
+  })
+}
+
+resource "aws_vpc_endpoint" "sqs" {
+  vpc_id              = aws_vpc.main.id
+  service_name        = "com.amazonaws.us-east-1.sqs"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = [for subnet in aws_subnet.private : subnet.id]
+  security_group_ids  = [aws_security_group.internal.id]
+  private_dns_enabled = true
+
+  tags = merge(var.tags, {
+    Name = "${local.name_prefix}-sqs-endpoint"
+  })
+}

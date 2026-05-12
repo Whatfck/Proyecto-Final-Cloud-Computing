@@ -21,11 +21,13 @@ createApp({
       },
       message: '',
       messageClass: 'alert-info',
+      serviceInfo: { service: 'unknown' },
     };
   },
   mounted() {
     this.loadProducts();
     this.loadOrders();
+    this.checkService();
   },
   methods: {
     onImageSelected(event) {
@@ -36,6 +38,14 @@ createApp({
     },
     async loadOrders() {
       this.orders = await api.getOrders();
+    },
+    async checkService() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/service-info`);
+        this.serviceInfo = await res.json();
+      } catch (e) {
+        console.warn('Could not check service info');
+      }
     },
     async createProduct() {
       const formData = new FormData();

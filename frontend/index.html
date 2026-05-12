@@ -12,7 +12,12 @@
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
             <div class="container">
                 <a class="navbar-brand" href="#">📦 Marketplace</a>
-                <div class="navbar-nav ms-auto">
+                <div class="navbar-nav ms-auto align-items-center">
+                    <span v-if="serviceInfo.service !== 'unknown'" class="me-3">
+                        <span :class="{'badge bg-primary': serviceInfo.service === 'main', 'badge bg-warning text-dark': serviceInfo.service === 'canary'}">
+                            Servicio: {{ serviceInfo.service }}
+                        </span>
+                    </span>
                     <a class="nav-link" href="#" @click="currentPage = 'products'">Productos</a>
                     <a class="nav-link" href="#" @click="currentPage = 'create-product'">Vender</a>
                     <a class="nav-link" href="#" @click="currentPage = 'orders'">Mis Órdenes</a>
@@ -70,7 +75,7 @@
                     </div>
                     <div class="mb-3">
                         <label for="productImage" class="form-label">Imagen del Producto</label>
-                        <input type="file" class="form-control" id="productImage" @change="onImageSelected" accept="image/*">
+                        <input type="file" class="form-control" id="productImage" @change="onImageSelected" accept="image/*" required>
                         <small class="text-muted">Formato: JPG, PNG. Máx 5MB</small>
                     </div>
                     <button type="submit" class="btn btn-success">Publicar Producto</button>
@@ -110,11 +115,11 @@
                         <div class="card shadow-sm">
                             <div class="card-body">
                                 <h5>Orden #{{ order.id }}</h5>
-                                <p>Producto: <strong>{{ order.productName }}</strong></p>
+                                <p>Producto: <strong>{{ order.productName || order.product_name }}</strong></p>
                                 <p>Cantidad: <strong>{{ order.quantity }}</strong></p>
                                 <p>Total: <strong>${{ order.total }}</strong></p>
                                 <p>Estado: <span :class="getStatusClass(order.status)">{{ order.status }}</span></p>
-                                <small class="text-muted">{{ order.createdAt }}</small>
+                                <small class="text-muted">{{ order.created_at || order.createdAt }}</small>
                             </div>
                         </div>
                     </div>

@@ -47,26 +47,25 @@ const sqs = new AWS.SQS({
 });
 
 // Configuración RDS
+const rawHost = process.env.DB_HOST || 'localhost';
 const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
+  host: rawHost.split(':')[0],
   user: process.env.DB_USER || 'admin',
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'marketplace',
   port: parseInt(process.env.DB_PORT || '5432', 10),
+  ssl: { rejectUnauthorized: false },
   max: 10,
 };
 
-// Pool de conexiones (mejor que conexión única)
 let pool;
 
-// Inicializar base de datos
 async function initDB() {
   try {
     pool = new Pool(dbConfig);
     dbConnection = await pool.connect();
     console.log('✅ Conectado a RDS PostgreSQL');
     
-    // Crear tablas si no existen
     await pool.query(`
       CREATE TABLE IF NOT EXISTS products (
         id SERIAL PRIMARY KEY,
@@ -93,18 +92,51 @@ async function initDB() {
       )
     `);
     
-    // Cargar datos existentes
+    // Check if products exist, otherwise seed
+    const productsCount = await pool.query('SELECT COUNT(*) FROM products');
+    if (parseInt(productsCount.rows[0].count) === 0) {
+      console.log('Seeding 15 initial products...');
+      const initialProducts = [
+        { name: 'Laptop Lenovo IdeaPad 3', desc: 'Laptop para estudio y trabajo', price: 650, stock: 8 },
+        { name: 'Mouse Logitech M170', desc: 'Mouse inalámbrico compacto', price: 18, stock: 25 },
+        { name: 'Teclado Mecánico Redragon Kumara', desc: 'Teclado gamer RGB', price: 55, stock: 12 },
+        { name: 'Monitor Samsung 24"', desc: 'Monitor Full HD IPS', price: 180, stock: 6 },
+        { name: 'Audífonos HyperX Cloud Stinger', desc: 'Audífonos para gaming y llamadas', price: 60, stock: 14 },
+        { name: 'SSD Kingston 1TB', desc: 'Unidad sólida SATA', price: 75, stock: 10 },
+        { name: 'Silla Gamer Cougar Armor', desc: 'Silla ergonómica reclinable', price: 240, stock: 3 },
+        { name: 'Control Xbox Series', desc: 'Control inalámbrico original', price: 65, stock: 7 },
+        { name: 'Mousepad XL RGB', desc: 'Superficie extendida para gaming', price: 22, stock: 15 },
+        { name: 'Webcam Logitech C920', desc: 'Cámara Full HD para streaming', price: 85, stock: 5 },
+        { name: 'Escritorio Minimalista', desc: 'Escritorio de madera 120cm', price: 140, stock: 4 },
+        { name: 'Lámpara LED Inteligente', desc: 'Luz ajustable con app móvil', price: 35, stock: 11 },
+        { name: 'Silla de Oficina Ergonómica', desc: 'Soporte lumbar ajustable', price: 190, stock: 2 },
+        { name: 'Organizador de Cables', desc: 'Kit organizador para escritorio', price: 12, stock: 30 },
+        { name: 'Cargador USB-C 30W', desc: 'Carga rápida compatible', price: 20, stock: 20 }
+      ];
+      for (const p of initialProducts) {
+        await pool.query(
+          'INSERT INTO products (name, description, price, stock) VALUES ($1, $2, $3, $4)',
+          [p.name, p.desc, p.price, p.stock]
+        );
+      }
+    }
+
+    // Add random placeholder images to products without images
+    await pool.query("UPDATE products SET image_url = 'https://picsum.photos/seed/' || id || '/300/200' WHERE image_url IS NULL");
+
     const productsResult = await pool.query('SELECT * FROM products ORDER BY id ASC');
     const ordersResult = await pool.query('SELECT * FROM orders ORDER BY id ASC');
     products = productsResult.rows.map((row) => ({
       ...row,
       price: parseFloat(row.price),
       stock: parseInt(row.stock, 10),
+      imageUrl: row.image_url,
     }));
     orders = ordersResult.rows.map((row) => ({
       ...row,
       quantity: parseInt(row.quantity, 10),
       total: parseFloat(row.total),
+      productName: row.product_name,
     }));
     console.log(`✅ Cargados ${products.length} productos y ${orders.length} órdenes`);
     
@@ -114,24 +146,7 @@ async function initDB() {
     pool = null;
     dbConnection = null;
     console.warn('⚠️  RDS no disponible, usando datos en memoria:', error.message);
-    products = [
-      {
-        id: 1,
-        name: 'Laptop Gamer',
-        description: 'Laptop de alto rendimiento para gaming',
-        price: 1200,
-        stock: 5,
-        image_url: null,
-      },
-      {
-        id: 2,
-        name: 'Mouse Inalámbrico',
-        description: 'Mouse gamer con precisión máxima',
-        price: 50,
-        stock: 20,
-        image_url: null,
-      },
-    ];
+    products = [];
   }
 }
 
@@ -143,7 +158,6 @@ async function uploadToS3(file, key) {
       Key: key,
       Body: file.buffer,
       ContentType: file.mimetype,
-      ACL: 'public-read',
     };
     
     const result = await s3.upload(params).promise();
@@ -185,12 +199,29 @@ async function sendOrderToSQS(order) {
 }
 
 // Rutas API
-app.get('/api/products', (req, res) => {
+app.get('/api/products', async (req, res) => {
+  if (pool) {
+    try {
+      const result = await pool.query('SELECT * FROM products ORDER BY id ASC');
+      const dbProducts = result.rows.map((row) => ({
+        ...row,
+        price: parseFloat(row.price),
+        stock: parseInt(row.stock, 10),
+        imageUrl: row.image_url,
+      }));
+      return res.json(dbProducts);
+    } catch (error) {
+      console.warn('Error fetching products from DB, falling back to memory:', error.message);
+    }
+  }
   res.json(products);
 });
 
 app.post('/api/products', upload.single('image'), async (req, res) => {
   try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'La foto del producto es obligatoria.' });
+    }
     const { name, description, price, stock } = req.body;
     
     let imageUrl = null;
@@ -230,7 +261,21 @@ app.post('/api/products', upload.single('image'), async (req, res) => {
   }
 });
 
-app.get('/api/orders', (req, res) => {
+app.get('/api/orders', async (req, res) => {
+  if (pool) {
+    try {
+      const result = await pool.query('SELECT * FROM orders ORDER BY id ASC');
+      const dbOrders = result.rows.map((row) => ({
+        ...row,
+        quantity: parseInt(row.quantity, 10),
+        total: parseFloat(row.total),
+        productName: row.product_name,
+      }));
+      return res.json(dbOrders);
+    } catch (error) {
+      console.warn('Error fetching orders from DB, falling back to memory:', error.message);
+    }
+  }
   res.json(orders);
 });
 
@@ -259,6 +304,7 @@ app.post('/api/orders', async (req, res) => {
       id: orders.length + 1,
       product_id: productId,
       product_name: productName,
+      productName: productName,
       quantity,
       total,
       buyer_name: buyerName,
@@ -302,6 +348,16 @@ app.post('/api/orders', async (req, res) => {
 // Ruta raíz redirect a index.html
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../frontend/index.html'));
+});
+
+// Service info (Main vs Canary)
+app.get('/api/service-info', (req, res) => {
+  const role = process.env.APP_ROLE || 'unknown';
+  res.json({
+    service: role,
+    port: process.env.PORT || 3000,
+    instanceId: process.env.HOSTNAME || require('os').hostname()
+  });
 });
 
 // Health check

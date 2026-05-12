@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 
 import boto3
-import psycopg2
+import pg8000.native
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -12,39 +12,25 @@ logger.setLevel(logging.INFO)
 sns_client = boto3.client("sns")
 sqs_client = boto3.client("sqs")
 
-
 def _get_db_conn():
-    return psycopg2.connect(
-        host=os.environ["DB_HOST"],
-        port=int(os.environ.get("DB_PORT", 5432)),
-        dbname=os.environ["DB_NAME"],
+    return pg8000.native.Connection(
         user=os.environ["DB_USER"],
         password=os.environ["DB_PASSWORD"],
-        connect_timeout=5,
+        host=os.environ["DB_HOST"],
+        database=os.environ["DB_NAME"],
+        port=int(os.environ.get("DB_PORT", 5432)),
+        timeout=10
     )
 
-
 def _ensure_error_log_table(conn):
-    with conn.cursor() as cur:
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS failed_orders (
-                id SERIAL PRIMARY KEY,
-                order_id VARCHAR(255),
-                error_body TEXT,
-                recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-    conn.commit()
-
-
-def _log_error_to_rds(conn, order_id, body):
-    with conn.cursor() as cur:
-        cur.execute(
-            "INSERT INTO failed_orders (order_id, error_body, recorded_at) VALUES (%s, %s, %s)",
-            (order_id, body, datetime.utcnow()),
+    conn.run("""
+        CREATE TABLE IF NOT EXISTS failed_orders (
+            id SERIAL PRIMARY KEY,
+            order_id VARCHAR(255),
+            error_body TEXT,
+            recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-    conn.commit()
-
+    """)
 
 def handler(event, context):
     topic_arn = os.environ.get("ADMIN_TOPIC_ARN", "")
@@ -67,7 +53,6 @@ def handler(event, context):
 
     logger.info("Found %d messages in DLQ.", len(messages))
 
-    # Conectar a RDS una sola vez para todos los mensajes
     conn = None
     try:
         conn = _get_db_conn()
@@ -90,7 +75,10 @@ def handler(event, context):
         # Registrar en RDS
         if conn:
             try:
-                _log_error_to_rds(conn, order_id, body)
+                conn.run(
+                    "INSERT INTO failed_orders (order_id, error_body, recorded_at) VALUES (:oid, :body, :ts)",
+                    oid=str(order_id), body=body, ts=datetime.utcnow()
+                )
                 logger.info("Error logged to RDS for order %s", order_id)
             except Exception as e:
                 logger.error("Could not log to RDS: %s", e)

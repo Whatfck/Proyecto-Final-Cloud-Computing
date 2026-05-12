@@ -142,3 +142,10 @@ variable "tags" {
     ManagedBy   = "terraform"
   }
 }
+
+variable "admin_email" {
+  description = "Admin email for SNS notifications (stored in tfvars, never committed)"
+  type        = string
+  default     = ""
+  sensitive   = true
+}

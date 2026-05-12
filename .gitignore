@@ -10,9 +10,18 @@
 # Artefactos de build
 *.tar.gz
 *.zip
+infra/terraform/build/
+infra/terraform/layers/
 
 # Node
 node_modules/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+.terraform.lock.hcl
 
 # OS
 .DS_Store

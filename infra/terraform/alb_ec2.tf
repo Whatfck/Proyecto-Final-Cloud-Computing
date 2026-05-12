@@ -57,6 +57,14 @@ resource "aws_security_group" "web" {
   }
 
   ingress {
+    description = "App port from NGINX proxy (internal)"
+    from_port   = 3000
+    to_port     = 3000
+    protocol    = "tcp"
+    self        = true
+  }
+
+  ingress {
     description = "SSH temporal"
     from_port   = 22
     to_port     = 22
@@ -121,18 +129,16 @@ resource "aws_lb_listener" "http" {
   }
 }
 
-resource "aws_launch_template" "web" {
-  name_prefix   = "${var.project_name}-web-"
-  image_id      = data.aws_ami.ubuntu.id
+resource "aws_instance" "canary_app" {
+  ami           = data.aws_ami.ubuntu.id
   instance_type = var.ec2_instance_type
   key_name      = "grupo3-marketplace-key"
+  subnet_id     = aws_subnet.public[1].id
 
   vpc_security_group_ids = [aws_security_group.web.id]
-  iam_instance_profile {
-    name = aws_iam_instance_profile.ec2_marketplace.name
-  }
+  iam_instance_profile   = aws_iam_instance_profile.ec2_marketplace.name
 
-  user_data = base64encode(templatefile("${path.module}/user_data.sh", {
+  user_data = base64encode(templatefile("${path.module}/user_data_app.sh", {
     aws_region           = var.aws_region
     aws_access_key_id    = var.aws_access_key_id
     aws_secret_key       = var.aws_secret_access_key
@@ -142,53 +148,64 @@ resource "aws_launch_template" "web" {
     s3_bucket_name       = aws_s3_bucket.product_images.id
     builds_bucket_name   = aws_s3_bucket.builds.id
     orders_queue_url     = aws_sqs_queue.orders.url
+    app_role             = "canary"
   }))
 
-  tag_specifications {
-    resource_type = "instance"
-
-    tags = merge(var.tags, {
-      Name = "${var.project_name}-web-instance"
-    })
-  }
-
-  tag_specifications {
-    resource_type = "volume"
-
-    tags = merge(var.tags, {
-      Name = "${var.project_name}-web-volume"
-    })
-  }
+  tags = merge(var.tags, {
+    Name = "${var.project_name}-web-canary-app"
+  })
 }
 
-resource "aws_autoscaling_group" "web" {
-  name_prefix               = "${var.project_name}-asg-"
-  min_size                  = var.ec2_min_capacity
-  desired_capacity          = var.ec2_desired_capacity
-  max_size                  = var.ec2_max_capacity
-  vpc_zone_identifier       = [for subnet in aws_subnet.public : subnet.id]
-  target_group_arns         = [aws_lb_target_group.web.arn]
-  health_check_type         = "ELB"
-  health_check_grace_period = 120
+resource "aws_instance" "main_app" {
+  ami           = data.aws_ami.ubuntu.id
+  instance_type = var.ec2_instance_type
+  key_name      = "grupo3-marketplace-key"
+  subnet_id     = aws_subnet.public[0].id
 
-  launch_template {
-    id      = aws_launch_template.web.id
-    version = "$Latest"
-  }
+  vpc_security_group_ids = [aws_security_group.web.id]
+  iam_instance_profile   = aws_iam_instance_profile.ec2_marketplace.name
 
-  dynamic "tag" {
-    for_each = merge(var.tags, {
-      Name = "${var.project_name}-web-asg"
-    })
+  user_data = base64encode(templatefile("${path.module}/user_data_app.sh", {
+    aws_region           = var.aws_region
+    aws_access_key_id    = var.aws_access_key_id
+    aws_secret_key       = var.aws_secret_access_key
+    db_endpoint          = aws_db_instance.marketplace.endpoint
+    db_port              = var.db_port
+    db_password          = var.db_password
+    s3_bucket_name       = aws_s3_bucket.product_images.id
+    builds_bucket_name   = aws_s3_bucket.builds.id
+    orders_queue_url     = aws_sqs_queue.orders.url
+    app_role             = "main"
+  }))
 
-    content {
-      key                 = tag.key
-      value               = tag.value
-      propagate_at_launch = true
-    }
-  }
+  tags = merge(var.tags, {
+    Name = "${var.project_name}-web-main-app"
+  })
+}
 
-  lifecycle {
-    create_before_destroy = true
-  }
+resource "aws_instance" "nginx_proxy" {
+  ami           = data.aws_ami.ubuntu.id
+  instance_type = var.ec2_instance_type
+  key_name      = "grupo3-marketplace-key"
+  subnet_id     = aws_subnet.public[0].id
+
+  vpc_security_group_ids = [aws_security_group.web.id]
+  iam_instance_profile   = aws_iam_instance_profile.ec2_marketplace.name
+
+  user_data = base64encode(templatefile("${path.module}/user_data_nginx.sh", {
+    main_ip              = aws_instance.main_app.private_ip
+    canary_ip            = aws_instance.canary_app.private_ip
+  }))
+
+  depends_on = [aws_instance.main_app, aws_instance.canary_app]
+
+  tags = merge(var.tags, {
+    Name = "${var.project_name}-web-nginx-proxy"
+  })
+}
+
+resource "aws_lb_target_group_attachment" "nginx_proxy" {
+  target_group_arn = aws_lb_target_group.web.arn
+  target_id        = aws_instance.nginx_proxy.id
+  port             = 80
 }

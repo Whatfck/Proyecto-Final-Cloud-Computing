@@ -39,8 +39,9 @@ const api = {
   },
 
   async createOrder(order) {
+    const API_GATEWAY_URL = 'https://dkooiiy388.execute-api.us-east-1.amazonaws.com';
     try {
-      const res = await fetch(`${API_BASE_URL}/api/orders`, {
+      const res = await fetch(`${API_GATEWAY_URL}/api/orders`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -49,7 +50,7 @@ const api = {
       });
       return await res.json();
     } catch (error) {
-      console.error('Error creating order:', error);
+      console.error('Error creating order via API Gateway:', error);
       return { error: error.message };
     }
   },

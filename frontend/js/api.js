@@ -1,5 +1,5 @@
-// API client para comunicarse con el backend Express
-const API_BASE_URL = window.location.origin;
+// API client para comunicarse con el backend Serverless (API Gateway)
+const API_BASE_URL = 'https://dkooiiy388.execute-api.us-east-1.amazonaws.com';
 
 const api = {
   async getProducts() {
@@ -39,9 +39,8 @@ const api = {
   },
 
   async createOrder(order) {
-    const API_GATEWAY_URL = 'https://dkooiiy388.execute-api.us-east-1.amazonaws.com';
     try {
-      const res = await fetch(`${API_GATEWAY_URL}/api/orders`, {
+      const res = await fetch(`${API_BASE_URL}/api/orders`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

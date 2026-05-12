@@ -4,7 +4,7 @@ set -e
 REGION=${1:-"us-east-1"}
 
 echo "=== Creando paquete del Backend ==="
-tar -czvf backend.tar.gz backend/ frontend/
+tar --exclude='backend/.env' -czvf backend.tar.gz backend/ frontend/
 
 echo "=== Subiendo a S3 ==="
 # Intentamos obtener el bucket dinámicamente si terraform ya fue aplicado

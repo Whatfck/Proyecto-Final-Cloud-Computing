@@ -1,10 +1,11 @@
-// API client para comunicarse con el backend Serverless (API Gateway)
-const API_BASE_URL = 'https://dkooiiy388.execute-api.us-east-1.amazonaws.com';
+// API client
+const API_GATEWAY_URL = 'https://dkooiiy388.execute-api.us-east-1.amazonaws.com';
+const API_BASE_URL = window.location.origin;
 
 const api = {
   async getProducts() {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/products`);
+      const res = await fetch(`${API_GATEWAY_URL}/api/products`);
       return await res.json();
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -30,7 +31,7 @@ const api = {
 
   async getOrders() {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/orders`);
+      const res = await fetch(`${API_GATEWAY_URL}/api/orders`);
       return await res.json();
     } catch (error) {
       console.error('Error fetching orders:', error);
@@ -40,7 +41,7 @@ const api = {
 
   async createOrder(order) {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/orders`, {
+      const res = await fetch(`${API_GATEWAY_URL}/api/orders`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
